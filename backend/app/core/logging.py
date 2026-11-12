@@ -120,4 +120,3 @@ def configure_logging(log_level: str = "INFO", log_format: str = "json") -> None
         uv_logger.handlers.clear()
         uv_logger.propagate = True
         uv_logger.setLevel(level)
-

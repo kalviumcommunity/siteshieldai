@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -105,12 +106,55 @@ class DocumentIngestResponse(BaseModel):
     """Response contract for POST /documents/ingest."""
 
     doc_id: str
+    status: Literal["ingested", "unchanged", "updated"] = "ingested"
+    unchanged: bool = False
     sha256_checksum: str
     page_count: int = Field(..., ge=0)
     chunks_created: int = Field(..., ge=0)
     tables_extracted: int = Field(..., ge=0)
     extraction_summary: ExtractionSummary
     warnings: list[str] = Field(default_factory=list)
+
+
+class ChunkRecord(BaseModel):
+    """Verified chunk payload with source document and location provenance."""
+
+    chunk_id: str
+    doc_id: str
+    doc_title: str
+    doc_type: DocumentType
+    jurisdiction: str
+    project_id: str | None = None
+    standard_code: str | None = None
+    version: str
+    publication_date: date | None = None
+    effective_date: date | None = None
+    status: DocumentStatus
+    confidentiality_tier: ConfidentialityTier
+    source_filename: str
+    sha256_checksum: str
+    chunk_index: int = Field(..., ge=0)
+    page_start: int = Field(..., ge=1)
+    page_end: int = Field(..., ge=1)
+    printed_page_label: str | None = None
+    section_id: str | None = None
+    section_path: list[str] = Field(default_factory=list)
+    content_type: ContentType
+    extraction_method: ExtractionMethod
+    ocr_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    char_start: int = Field(..., ge=0)
+    char_end: int = Field(..., ge=0)
+    token_estimate: int = Field(..., ge=1)
+    text_for_embedding: str
+    text_verbatim: str
+
+
+class DocumentChunksResponse(BaseModel):
+    """Response contract for GET /documents/{doc_id}/chunks."""
+
+    doc_id: str
+    total_chunks: int = Field(..., ge=0)
+    chunks: list[ChunkRecord] = Field(default_factory=list)
 
 
 class DocumentRecord(BaseModel):

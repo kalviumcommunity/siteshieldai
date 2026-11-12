@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,7 +12,7 @@ from app.main import create_app
 
 
 @pytest.fixture
-def test_settings() -> Settings:
+def test_settings(tmp_path: Path) -> Settings:
     """Provide isolated test settings independent of any local `.env` file."""
     return Settings(
         _env_file=None,
@@ -18,6 +20,7 @@ def test_settings() -> Settings:
         log_level="INFO",
         log_format="json",
         cors_origins=["http://localhost:3000"],
+        ingestion_db_path=str(tmp_path / "test_ingestion.db"),
     )
 
 

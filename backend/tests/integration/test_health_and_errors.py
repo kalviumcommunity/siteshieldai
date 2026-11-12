@@ -96,4 +96,3 @@ def test_cors_headers_on_preflight(client: TestClient) -> None:
     )
     assert res.status_code == 200
     assert res.headers.get("access-control-allow-origin") == "http://localhost:3000"
-

@@ -195,4 +195,3 @@ def register_exception_handlers(app: FastAPI) -> None:
         _handle_http_exception,  # type: ignore[arg-type]
     )
     app.add_exception_handler(Exception, _handle_unexpected_error)
-
