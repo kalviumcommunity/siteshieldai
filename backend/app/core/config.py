@@ -65,7 +65,8 @@ class Settings(BaseSettings):
     vector_db_url: str | None = None
     vector_db_collection: str = "siteshield_chunks"
 
-    # Ingestion guardrails (configuration only)
+    # Ingestion guardrails & local persistence
+    ingestion_db_path: str = "data/processed/siteshield_ingestion.db"
     max_upload_size_mb: int = Field(default=25, ge=1, le=500)
     allowed_document_extensions: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [".pdf", ".md", ".txt"]

@@ -2,7 +2,7 @@
 
 FastAPI backend service foundation for **Site Shield AI**, implementing environment-driven configuration, structured JSON logging, centralized error handling, Pydantic API contracts, and health verification.
 
-> **Scope Notice:** This stage establishes the backend foundation only. Document ingestion, chunking, embeddings, vector storage, retrieval, and LLM generation modules are intentionally unimplemented pending subsequent sprint gates.
+> **Scope Notice:** This stage implements the backend foundation and the **document ingestion pipeline** (validation, PDF/Markdown/text extraction, cleaning, cross-page table stitching, hierarchical chunking, and SQLite manifest/chunk persistence). Embeddings, vector storage, retrieval, and LLM generation remain unimplemented pending subsequent sprint gates.
 
 ## Directory Structure
 
@@ -11,6 +11,7 @@ backend/
 ├── app/
 │   ├── api/
 │   │   ├── routes/
+│   │   │   ├── documents.py    # POST /documents/ingest, GET /documents*
 │   │   │   └── health.py       # GET /health endpoint
 │   │   └── router.py           # Top-level API router
 │   ├── core/
@@ -18,13 +19,13 @@ backend/
 │   │   ├── exceptions.py       # AppError hierarchy & FastAPI error handlers
 │   │   └── logging.py          # Structured JSON/console logging + request_id context
 │   ├── generation/             # Reserved for grounded generation & citation validation
-│   ├── ingestion/              # Reserved for document extraction & hierarchical chunking
+│   ├── ingestion/              # Document validation, extraction, cleaning, chunking, SQLite store
 │   ├── retrieval/              # Reserved for hybrid retrieval & reranking
 │   ├── schemas/                # Pydantic v2 request/response schemas
 │   └── main.py                 # FastAPI app factory & middleware
 ├── tests/
-│   ├── unit/                   # Config, logging, exceptions, schema tests
-│   └── integration/            # Health endpoint, request ID, error envelope tests
+│   ├── unit/                   # Config, logging, exceptions, schemas, ingestion unit tests
+│   └── integration/            # Health, error envelope, and end-to-end ingestion tests
 ├── pyproject.toml              # Ruff & pytest configuration
 ├── requirements.txt            # Runtime dependencies
 └── requirements-dev.txt        # Runtime + test & lint dependencies
@@ -66,6 +67,7 @@ pip install -r requirements.txt
 | `API_HOST` | `127.0.0.1` | Server bind host |
 | `API_PORT` | `8000` | Server bind port (`1–65535`) |
 | `CORS_ORIGINS` | `["http://localhost:3000"]` | Comma-separated or JSON array of allowed origins |
+| `INGESTION_DB_PATH` | `data/processed/siteshield_ingestion.db` | SQLite registry path for ingested documents & chunks |
 | `MAX_UPLOAD_SIZE_MB` | `25` | Maximum upload size config (`1–500`) |
 | `ALLOWED_DOCUMENT_EXTENSIONS` | `[".pdf", ".md", ".txt"]` | Comma-separated or JSON array of extensions |
 | `VECTOR_DB_PROVIDER` | `None` | Deferred RAG vector store provider name |
@@ -82,7 +84,23 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 Verify endpoints:
 - Health check: `GET http://127.0.0.1:8000/health`
+- Document ingestion: `POST http://127.0.0.1:8000/documents/ingest`
+- List documents: `GET http://127.0.0.1:8000/documents`
+- Document details & chunks: `GET http://127.0.0.1:8000/documents/{doc_id}` and `/chunks`
 - Interactive OpenAPI docs: `http://127.0.0.1:8000/docs`
+
+## Running CLI Document Ingestion
+
+From the repository root with `backend/.venv` activated:
+
+```bash
+backend/.venv/bin/python scripts/ingest_documents.py \
+  --file SiteShield_AI_PRD.pdf \
+  --title "SiteShield AI (PRD) Team Fire" \
+  --doc-type spec \
+  --version v1.0 \
+  --show-chunks
+```
 
 ## Running Tests & Linting
 

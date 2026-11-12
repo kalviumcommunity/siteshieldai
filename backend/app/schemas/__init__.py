@@ -2,8 +2,10 @@
 
 from app.schemas.common import ErrorDetail, ErrorResponse
 from app.schemas.documents import (
+    ChunkRecord,
     ConfidentialityTier,
     ContentType,
+    DocumentChunksResponse,
     DocumentIngestMetadata,
     DocumentIngestResponse,
     DocumentListResponse,
@@ -28,6 +30,7 @@ from app.schemas.query import (
 )
 
 __all__ = [
+    "ChunkRecord",
     "CitationItem",
     "ConfidentialityTier",
     "ConflictItem",
@@ -36,6 +39,7 @@ __all__ = [
     "ContentType",
     "DependencyHealth",
     "DependencyState",
+    "DocumentChunksResponse",
     "DocumentIngestMetadata",
     "DocumentIngestResponse",
     "DocumentListResponse",
