@@ -91,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(api_router)
+    app.include_router(api_router, prefix="/api/v1")
 
     logger.info(
         "Application initialized",

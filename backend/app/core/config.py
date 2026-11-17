@@ -67,6 +67,22 @@ class Settings(BaseSettings):
     vector_db_collection: str = "siteshield_chunks"
 
     @property
+    def effective_llm_provider(self) -> str:
+        """Return normalized active LLM provider (openai if key provided, else mock)."""
+        if self.llm_provider and self.llm_provider.strip():
+            return self.llm_provider.strip().lower()
+        if self.llm_api_key and self.llm_api_key.get_secret_value().strip():
+            return "openai"
+        return "mock"
+
+    @property
+    def effective_llm_model(self) -> str:
+        """Return normalized active LLM model identifier."""
+        if self.llm_model and self.llm_model.strip():
+            return self.llm_model.strip()
+        return "gpt-4o-mini"
+
+    @property
     def effective_embedding_provider(self) -> str:
         """Return normalized active embedding provider (defaulting to fastembed)."""
         return (self.embedding_provider or "fastembed").strip().lower()
