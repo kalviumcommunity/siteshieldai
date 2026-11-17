@@ -352,4 +352,3 @@ class IngestionStore:
             )
             for row in rows
         ]
-

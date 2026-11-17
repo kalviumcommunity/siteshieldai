@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
@@ -12,6 +13,7 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import ResourceNotFoundError, ValidationAppError
 from app.ingestion.service import IngestionService
 from app.ingestion.store import IngestionStore
+from app.retrieval import VectorIndexer, get_embedding_adapter, get_vector_store
 from app.schemas.documents import (
     DocumentChunksResponse,
     DocumentIngestMetadata,
@@ -21,6 +23,8 @@ from app.schemas.documents import (
     DocumentStatus,
     DocumentType,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -41,11 +45,33 @@ def _get_ingestion_store(
     return store
 
 
+def _get_vector_indexer(
+    request: Request,
+    settings: Annotated[Settings, Depends(_get_settings)],
+) -> VectorIndexer | None:
+    indexer: VectorIndexer | None = getattr(request.app.state, "vector_indexer", None)
+    if indexer is None and getattr(request.app.state, "enable_vector_index", True):
+        try:
+            adapter = get_embedding_adapter(settings)
+            vector_store = get_vector_store(settings)
+            indexer = VectorIndexer(
+                embedding_adapter=adapter,
+                vector_store=vector_store,
+                collection_name=settings.vector_db_collection,
+            )
+            request.app.state.vector_indexer = indexer
+        except Exception as exc:
+            logger.warning("Vector indexer initialization deferred: %s", exc)
+            return None
+    return indexer
+
+
 def _get_ingestion_service(
     settings: Annotated[Settings, Depends(_get_settings)],
     store: Annotated[IngestionStore, Depends(_get_ingestion_store)],
+    indexer: Annotated[VectorIndexer | None, Depends(_get_vector_indexer)],
 ) -> IngestionService:
-    return IngestionService(settings=settings, store=store)
+    return IngestionService(settings=settings, store=store, vector_indexer=indexer)
 
 
 @router.post(
@@ -149,4 +175,3 @@ async def get_document_chunks(
         raise ResourceNotFoundError(f"Document '{doc_id}' was not found.")
     chunks = store.get_chunks(doc_id)
     return DocumentChunksResponse(doc_id=doc_id, total_chunks=len(chunks), chunks=chunks)
-

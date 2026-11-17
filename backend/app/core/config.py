@@ -63,7 +63,34 @@ class Settings(BaseSettings):
     vector_db_provider: str | None = None
     vector_db_path: str | None = None
     vector_db_url: str | None = None
+    vector_db_api_key: SecretStr | None = None
     vector_db_collection: str = "siteshield_chunks"
+
+    @property
+    def effective_embedding_provider(self) -> str:
+        """Return normalized active embedding provider (defaulting to fastembed)."""
+        return (self.embedding_provider or "fastembed").strip().lower()
+
+    @property
+    def effective_embedding_model(self) -> str:
+        """Return normalized active embedding model name."""
+        if self.embedding_model and self.embedding_model.strip():
+            return self.embedding_model.strip()
+        if self.effective_embedding_provider == "openai":
+            return "text-embedding-3-small"
+        return "BAAI/bge-base-en-v1.5"
+
+    @property
+    def effective_vector_db_provider(self) -> str:
+        """Return normalized active vector database provider (defaulting to qdrant)."""
+        return (self.vector_db_provider or "qdrant").strip().lower()
+
+    @property
+    def effective_vector_db_path(self) -> str | None:
+        """Return local vector db path if no remote URL is configured."""
+        if self.vector_db_url and self.vector_db_url.strip():
+            return None
+        return self.vector_db_path or "data/qdrant"
 
     # Ingestion guardrails & local persistence
     ingestion_db_path: str = "data/processed/siteshield_ingestion.db"

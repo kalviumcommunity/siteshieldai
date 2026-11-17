@@ -13,6 +13,7 @@ from app.ingestion.chunker import chunk_extracted_document
 from app.ingestion.extractors import OcrCallback, extract_document
 from app.ingestion.store import IngestionStore
 from app.ingestion.validator import validate_document_input
+from app.retrieval.indexer import VectorIndexer
 from app.schemas.documents import (
     ContentType,
     DocumentIngestMetadata,
@@ -50,17 +51,19 @@ def _manifest_matches(existing: DocumentRecord, metadata: DocumentIngestMetadata
 
 
 class IngestionService:
-    """Repeatable document ingestion pipeline without embedding generation."""
+    """Repeatable document ingestion pipeline with optional vector indexing synchronization."""
 
     def __init__(
         self,
         settings: Settings,
         store: IngestionStore,
         ocr_fn: OcrCallback | None = None,
+        vector_indexer: VectorIndexer | None = None,
     ) -> None:
         self.settings = settings
         self.store = store
         self.ocr_fn = ocr_fn
+        self.vector_indexer = vector_indexer
 
     def ingest_bytes(
         self,
@@ -100,6 +103,7 @@ class IngestionService:
                     sha256_checksum=checksum,
                     page_count=existing_doc.page_count,
                     chunks_created=existing_doc.chunk_count,
+                    vectors_indexed=0,
                     tables_extracted=stats["tables_extracted"],
                     extraction_summary=ExtractionSummary(
                         native_pages=stats["native_pages"],
@@ -163,6 +167,14 @@ class IngestionService:
             warnings=warnings,
         )
 
+        vectors_indexed = 0
+        if self.vector_indexer is not None:
+            vectors_indexed = self.vector_indexer.sync_document(
+                doc_record=record,
+                chunks=chunks,
+                ingest_status=ingest_status,
+            )
+
         logger.info(
             "Document ingestion completed",
             extra={
@@ -172,6 +184,7 @@ class IngestionService:
                 "sha256_checksum": checksum,
                 "page_count": extracted.page_count,
                 "chunks_created": len(chunks),
+                "vectors_indexed": vectors_indexed,
                 "tables_extracted": tables_extracted,
             },
         )
@@ -182,6 +195,7 @@ class IngestionService:
             sha256_checksum=checksum,
             page_count=extracted.page_count,
             chunks_created=len(chunks),
+            vectors_indexed=vectors_indexed,
             tables_extracted=tables_extracted,
             extraction_summary=ExtractionSummary(
                 native_pages=native_pages,

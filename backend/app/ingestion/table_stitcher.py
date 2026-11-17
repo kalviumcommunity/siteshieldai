@@ -80,4 +80,3 @@ def format_table_markdown(table: ExtractedTable, rows: list[list[str]] | None = 
         body_lines.append("| " + " | ".join(_escape_md_cell(cell) for cell in padded) + " |")
 
     return "\n".join([header_line, sep_line, *body_lines])
-

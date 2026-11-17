@@ -49,9 +49,7 @@ coverage.xml
 .nox/
 
 # Local corpus data and vector databases (keep sensitive/large data out of Git)
-data/raw/
-data/processed/
-data/vector_store/
+data/
 chroma_db/
 qdrant_storage/
 *.db

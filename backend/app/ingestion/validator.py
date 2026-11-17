@@ -68,4 +68,3 @@ def validate_document_input(
             )
 
     return clean_name, ext
-
