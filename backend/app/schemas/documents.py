@@ -111,6 +111,7 @@ class DocumentIngestResponse(BaseModel):
     sha256_checksum: str
     page_count: int = Field(..., ge=0)
     chunks_created: int = Field(..., ge=0)
+    vectors_indexed: int = Field(default=0, ge=0)
     tables_extracted: int = Field(..., ge=0)
     extraction_summary: ExtractionSummary
     warnings: list[str] = Field(default_factory=list)

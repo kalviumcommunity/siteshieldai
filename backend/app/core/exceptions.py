@@ -81,6 +81,20 @@ class ServiceUnavailableError(AppError):
     error_code = "SERVICE_UNAVAILABLE"
 
 
+class EmbeddingProviderError(ServiceUnavailableError):
+    """Raised when embedding provider communication or inference fails."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    error_code = "EMBEDDING_PROVIDER_ERROR"
+
+
+class VectorStoreError(ServiceUnavailableError):
+    """Raised when vector database operations or connection fails."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    error_code = "VECTOR_STORE_ERROR"
+
+
 def _build_error_response(
     *,
     request: Request,

@@ -86,4 +86,3 @@ def strip_running_headers_footers(pages: list[ExtractedPage]) -> list[ExtractedP
         page.elements = kept
 
     return pages
-

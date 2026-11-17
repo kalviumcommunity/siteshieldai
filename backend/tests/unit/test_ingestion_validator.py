@@ -54,4 +54,3 @@ def test_validate_rejects_malformed_magic_bytes_and_encoding() -> None:
     with pytest.raises(ValidationAppError) as utf_exc:
         validate_document_input("bad_utf8.md", b"\xff\xfe\xfd", settings)
     assert utf_exc.value.error_code == "MALFORMED_DOCUMENT"
-

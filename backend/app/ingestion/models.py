@@ -90,4 +90,3 @@ class DocumentChunk:
     token_estimate: int
     text_for_embedding: str
     text_verbatim: str
-
