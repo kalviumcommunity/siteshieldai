@@ -272,14 +272,33 @@ class DeterministicMockEmbeddingAdapter:
         return self._dimension
 
     def _hash_to_vector(self, text: str) -> list[float]:
-        digest = hashlib.sha256(text.encode("utf-8")).digest()
+        import re
+
+        cleaned = text.strip() if text else ""
+        if not cleaned:
+            return [0.0] * self._dimension
+
+        tokens = re.findall(r"\b[A-Za-z0-9]+\b", cleaned.lower())
+        values = [0.0] * self._dimension
+
+        # Whole-string base hash
+        digest = hashlib.sha256(cleaned.encode("utf-8")).digest()
         seed = int.from_bytes(digest[:8], "big")
-        values: list[float] = []
         state = seed
-        for _ in range(self._dimension):
+        for i in range(self._dimension):
             state = (state * 6364136223846793005 + 1442695040888963407) & 0xFFFFFFFFFFFFFFFF
             val = ((state / 0xFFFFFFFFFFFFFFFF) * 2.0) - 1.0
-            values.append(val)
+            values[i] += val * 0.1
+
+        # Token-level hash so documents with overlapping keywords correlate positively
+        for tok in tokens:
+            t_digest = hashlib.sha256(tok.encode("utf-8")).digest()
+            t_seed = int.from_bytes(t_digest[:8], "big")
+            t_state = t_seed
+            for i in range(self._dimension):
+                t_state = (t_state * 6364136223846793005 + 1442695040888963407) & 0xFFFFFFFFFFFFFFFF
+                val = ((t_state / 0xFFFFFFFFFFFFFFFF) * 2.0) - 1.0
+                values[i] += val
 
         norm = math.sqrt(sum(v * v for v in values)) or 1.0
         return [v / norm for v in values]

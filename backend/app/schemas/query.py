@@ -79,7 +79,7 @@ class CitationItem(BaseModel):
     page_end: int = Field(..., ge=1)
     content_type: ContentType
     extraction_method: ExtractionMethod
-    retrieval_score: float = Field(..., ge=0.0)
+    retrieval_score: float = Field(..., ge=-1.0, le=1.0)
     text_verbatim: str
 
 
