@@ -66,6 +66,38 @@ STOP_WORDS = {
     "must",
     "be",
     "been",
+    "under",
+    "above",
+    "with",
+    "from",
+    "by",
+    "about",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "between",
+    "against",
+    "out",
+    "over",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "than",
+    "too",
+    "very",
+    "have",
+    "has",
+    "had",
+    "having",
 }
 
 
@@ -160,7 +192,7 @@ class QueryService:
         has_lexical_match = False
         for hit in hits:
             hit_tokens = {t.lower() for t in re.findall(r"\b[A-Za-z0-9]+\b", hit.text_verbatim)}
-            if query_tokens.intersection(hit_tokens):
+            if len(query_tokens.intersection(hit_tokens)) >= 2:
                 has_lexical_match = True
                 break
 
@@ -217,7 +249,7 @@ class QueryService:
         # -------------------------------------------------------------
         # Step 5: Detect cross-document and revision conflicts
         # -------------------------------------------------------------
-        conflicts = self.conflict_detector.detect_conflicts(evidence_blocks)
+        conflicts = self.conflict_detector.detect_conflicts(evidence_blocks, cleaned_query)
 
         # -------------------------------------------------------------
         # Step 6: Grounded LLM Generation
@@ -240,7 +272,7 @@ class QueryService:
                     "evidence to answer this requirement."
                 ),
                 citations=[],
-                conflicts=conflicts,
+                conflicts=[],
                 abstention_reason=(
                     draft.abstain_reason or "Insufficient regulatory evidence in corpus."
                 ),
@@ -269,7 +301,7 @@ class QueryService:
                 status=QueryStatus.ABSTAINED,
                 answer="I cannot verify the generated answer against the retrieved source clauses.",
                 citations=[],
-                conflicts=conflicts,
+                conflicts=[],
                 abstention_reason=validation.abstain_reason,
                 latency_ms=latency,
                 disclaimer=STANDARD_DISCLAIMER,
@@ -277,8 +309,16 @@ class QueryService:
 
         # -------------------------------------------------------------
         # Step 10: Compile Final Verified Response
+        # Filter surfaced conflicts to those directly relevant to cited documents
         # -------------------------------------------------------------
-        status = QueryStatus.CONFLICT_FLAGGED if conflicts else QueryStatus.SUPPORTED
+        cited_doc_ids = {c.doc_id for c in validation.citations}
+        relevant_conflicts = [
+            c
+            for c in conflicts
+            if c.source_a.doc_id in cited_doc_ids or c.source_b.doc_id in cited_doc_ids
+        ]
+
+        status = QueryStatus.CONFLICT_FLAGGED if relevant_conflicts else QueryStatus.SUPPORTED
         latency.total = round((time.perf_counter() - start_total) * 1000)
 
         logger.info(
@@ -287,7 +327,7 @@ class QueryService:
                 "query_id": query_id,
                 "status": status.value,
                 "citations_count": len(validation.citations),
-                "conflicts_count": len(conflicts),
+                "conflicts_count": len(relevant_conflicts),
                 "total_latency_ms": latency.total,
             },
         )
@@ -297,7 +337,7 @@ class QueryService:
             status=status,
             answer=validation.verified_answer,
             citations=validation.citations,
-            conflicts=conflicts,
+            conflicts=relevant_conflicts,
             abstention_reason=None,
             latency_ms=latency,
             disclaimer=STANDARD_DISCLAIMER,

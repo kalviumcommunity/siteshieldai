@@ -69,6 +69,7 @@ class DocumentIngestMetadata(BaseModel):
     publication_date: date | None = None
     effective_date: date | None = None
     supersedes_doc_id: str | None = Field(default=None, max_length=128)
+    status: DocumentStatus = DocumentStatus.ACTIVE
     confidentiality_tier: ConfidentialityTier = ConfidentialityTier.INTERNAL
 
     @field_validator("doc_title", "jurisdiction", "version")

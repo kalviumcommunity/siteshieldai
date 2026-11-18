@@ -6,6 +6,7 @@ import hashlib
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from app.core.config import Settings
 from app.core.exceptions import ConflictAppError
@@ -13,13 +14,14 @@ from app.ingestion.chunker import chunk_extracted_document
 from app.ingestion.extractors import OcrCallback, extract_document
 from app.ingestion.store import IngestionStore
 from app.ingestion.validator import validate_document_input
-from app.retrieval.indexer import VectorIndexer
+
+if TYPE_CHECKING:
+    from app.retrieval.indexer import VectorIndexer
 from app.schemas.documents import (
     ContentType,
     DocumentIngestMetadata,
     DocumentIngestResponse,
     DocumentRecord,
-    DocumentStatus,
     ExtractionMethod,
     ExtractionSummary,
 )
@@ -150,7 +152,7 @@ class IngestionService:
             publication_date=metadata.publication_date,
             effective_date=metadata.effective_date,
             supersedes_doc_id=metadata.supersedes_doc_id,
-            status=DocumentStatus.ACTIVE,
+            status=metadata.status,
             confidentiality_tier=metadata.confidentiality_tier,
             source_filename=clean_name,
             sha256_checksum=checksum,
