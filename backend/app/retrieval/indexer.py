@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from app.ingestion.models import DocumentChunk
+if TYPE_CHECKING:
+    from app.ingestion.models import DocumentChunk
 from app.retrieval.embeddings import EmbeddingAdapter
 from app.retrieval.vector_store import VectorStorePort
 from app.schemas.documents import ChunkRecord, DocumentRecord

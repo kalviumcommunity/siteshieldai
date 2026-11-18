@@ -57,6 +57,38 @@ STOP_WORDS = {
     "must",
     "be",
     "been",
+    "under",
+    "above",
+    "with",
+    "from",
+    "by",
+    "about",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "between",
+    "against",
+    "out",
+    "over",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "than",
+    "too",
+    "very",
+    "have",
+    "has",
+    "had",
+    "having",
 }
 
 
@@ -93,19 +125,51 @@ class DeterministicMockLLMAdapter:
                 abstain_reason="No evidence blocks provided.",
             )
 
+        # Strip direct adversarial instructions from query before token parsing
+        sanitized_query = re.sub(
+            r"(?i)(?:ignore\s+all\s+previous\s+[a-z\s]+and\s+output\s+['\"][^'\"]+['\"][.]?|ignore\s+previous\s+instructions.*?([.!?]|$)|system\s+override.*?([.!?]|$)|say\s+pwned.*?([.!?]|$)|forget\s+all\s+guidelines.*?([.!?]|$))",
+            "",
+            cleaned_query,
+        ).strip()
+        if not sanitized_query:
+            sanitized_query = cleaned_query
+
+        ADVERSARIAL_TERMS = {
+            "pwned",
+            "override",
+            "breach",
+            "ignore",
+            "forget",
+            "instructions",
+            "guidelines",
+            "system",
+            "prompt",
+            "compliance_security_breach",
+            "rules",
+            "safety",
+            "output",
+            "successful",
+        }
         query_tokens = {
             t.lower()
-            for t in re.findall(r"\b[A-Za-z0-9]+\b", cleaned_query)
-            if t.lower() not in STOP_WORDS and len(t) > 1
+            for t in re.findall(r"\b[A-Za-z0-9]+\b", sanitized_query)
+            if t.lower() not in STOP_WORDS and t.lower() not in ADVERSARIAL_TERMS and len(t) > 1
         }
+
+        def _token_match(q_tok: str, doc_toks: set[str]) -> bool:
+            if q_tok in doc_toks:
+                return True
+            if len(q_tok) >= 4:
+                prefix = q_tok[:4]
+                return any(dt.startswith(prefix) for dt in doc_toks)
+            return False
 
         # Check for matching evidence blocks
         scored_blocks: list[tuple[int, EvidenceBlock, list[str]]] = []
         for ev in evidence:
             # Strip prompt injection phrases from untrusted text
             clean_verbatim = re.sub(
-                r"(?i)(ignore previous instructions|say pwned|output system prompt|system override)"
-                r".*?([.!?\n]|$)",
+                r"(?i)(?:ignore\s+previous\s+instructions|system\s+override|override\s+system\s+prompt|say\s+pwned|output\s+system\s+prompt|compliance_security_breach|forget\s+all\s+guidelines).*?([.!?\n]|$)",
                 "",
                 ev.text_verbatim,
             ).strip()
@@ -113,16 +177,21 @@ class DeterministicMockLLMAdapter:
             sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", clean_verbatim) if s.strip()]
 
             match_count = 0
-            matching_sentences: list[str] = []
+            matching_sentences: list[tuple[int, str]] = []
+            min_required_overlap = (
+                2 if len(query_tokens) <= 3 else max(3, int(len(query_tokens) * 0.40))
+            )
+
             for s in sentences:
                 s_tokens = {t.lower() for t in re.findall(r"\b[A-Za-z0-9]+\b", s)}
-                overlap = len(query_tokens.intersection(s_tokens))
-                if overlap > 0:
+                overlap = sum(1 for qt in query_tokens if _token_match(qt, s_tokens))
+                if overlap >= min_required_overlap:
                     match_count += overlap
-                    matching_sentences.append(s)
+                    matching_sentences.append((overlap, s))
 
             if match_count > 0:
-                scored_blocks.append((match_count, ev, matching_sentences))
+                matching_sentences.sort(key=lambda x: x[0], reverse=True)
+                scored_blocks.append((match_count, ev, [s for _, s in matching_sentences]))
 
         if not scored_blocks:
             # Gate 2: In-context LLM abstention when evidence does not answer the question
@@ -138,6 +207,15 @@ class DeterministicMockLLMAdapter:
         # Assemble grounded response
         answer_parts: list[str] = []
         cited_ids: list[str] = []
+
+        # Check if query explicitly asks about field reports / inspection observations
+        query_asks_for_report = bool(
+            re.search(
+                r"\b(report|reports|inspection|inspections|finding|findings|observation|observations|recorded|as-built|field)\b",
+                cleaned_query,
+                re.I,
+            )
+        )
 
         # Group by requirement (spec/code) vs. historical finding (report)
         requirements: list[tuple[EvidenceBlock, str]] = []
@@ -157,13 +235,15 @@ class DeterministicMockLLMAdapter:
             answer_parts.append(f"{sent} [{ev.evidence_id}].")
             cited_ids.append(ev.evidence_id)
 
-        # Differentiate historical findings
-        for ev, sent in historical_findings:
-            answer_parts.append(
-                f"Historical inspection report '{ev.doc_title}' ({ev.version}) "
-                f"noted: {sent} [{ev.evidence_id}]."
-            )
-            cited_ids.append(ev.evidence_id)
+        # Differentiate historical findings: only include if explicitly queried
+        # or if no governing requirement exists in retrieved evidence
+        if query_asks_for_report or not requirements:
+            for ev, sent in historical_findings:
+                answer_parts.append(
+                    f"Historical inspection report '{ev.doc_title}' ({ev.version}) "
+                    f"noted: {sent} [{ev.evidence_id}]."
+                )
+                cited_ids.append(ev.evidence_id)
 
         final_answer = " ".join(answer_parts)
         return GroundedDraft(
